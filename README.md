@@ -510,9 +510,10 @@ MIT License — See LICENSE file
 
 ## Author
 
-**Uday Chauhan**  
-Email: chauhan.s.uday26@gmail.com  
-GitHub: [@udaychauhan](https://github.com/udaychauhan)
+**UC Guy**  
+Email: coffee.devloper@gmail.com  
+GitHub: [@ucguy4u](https://github.com/ucguy4u)  
+Organization: [DevelopersCoffee](https://github.com/DevelopersCoffee)
 
 ---
 
