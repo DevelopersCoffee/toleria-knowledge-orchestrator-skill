@@ -1,0 +1,39 @@
+{
+  "name": "toleria-digital-twin",
+  "version": "1.0.0",
+  "description": "Extract and continuously sync codebase knowledge to Toleria vault. Digital twin keeps knowledge graph updated.",
+  "author": "Toleria",
+  "license": "MIT",
+  "triggers": [
+    "/toleria-digital-twin",
+    "extract knowledge",
+    "sync knowledge graph",
+    "digital twin"
+  ],
+  "files": [
+    "SKILL.md",
+    "extract-and-sync.sh"
+  ],
+  "dependencies": {
+    "toleria": ">=1.0.0",
+    "jq": ">=1.6",
+    "bash": ">=4.0"
+  },
+  "config": {
+    "VAULT_ROOT": "~/Documents/Vault",
+    "TOLERIA_REPO": "~/workspace/toleria-knowledge-orchestrator-skill",
+    "ENABLE_CONTINUOUS_SYNC": false,
+    "SYNC_INTERVAL": "daily"
+  },
+  "capabilities": {
+    "scan_codebase": true,
+    "extract_decisions": true,
+    "extract_patterns": true,
+    "extract_tech_debt": true,
+    "process_through_toleria": true,
+    "validate_schema": true,
+    "generate_index": true,
+    "schedule_continuous_sync": false,
+    "query_knowledge_graph": true
+  }
+}
