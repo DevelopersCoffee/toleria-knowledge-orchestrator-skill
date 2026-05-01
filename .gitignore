@@ -7,3 +7,22 @@ dist/
 .vault/
 .toleria/
 *.tmp
+
+# Local configuration
+.claude/
+.gemini/
+.copilot/
+.codex/
+settings.local.json
+.env
+.env.local
+
+# Local development
+.vscode/
+.idea/
+*.iml
+
+# OS files
+Thumbs.db
+.AppleDouble/
+.LSOverride/

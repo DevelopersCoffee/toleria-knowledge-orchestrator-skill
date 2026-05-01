@@ -64,7 +64,7 @@ Platform detection tested:
 ```bash
 source platform.sh
 echo $PLATFORM_OS       # Darwin (macOS), Linux, Windows
-get_home                # /Users/udaychauhan (macOS/Linux) or C:\Users\... (Windows)
+get_home                # /Users/username (macOS/Linux) or C:\Users\... (Windows)
 ```
 
 ## Usage Notes

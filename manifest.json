@@ -9,10 +9,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/udaychauhan/toleria-knowledge-orchestrator-skill"
+    "url": "https://github.com/DevelopersCoffee/toleria-knowledge-orchestrator-skill"
   },
-  "homepage": "https://github.com/udaychauhan/toleria-knowledge-orchestrator-skill",
-  "documentation": "https://github.com/udaychauhan/toleria-knowledge-orchestrator-skill/blob/main/README.md",
+  "homepage": "https://github.com/DevelopersCoffee/toleria-knowledge-orchestrator-skill",
+  "documentation": "https://github.com/DevelopersCoffee/toleria-knowledge-orchestrator-skill/blob/main/README.md",
   "category": "engineering-productivity",
   "subcategories": [
     "knowledge-management",
