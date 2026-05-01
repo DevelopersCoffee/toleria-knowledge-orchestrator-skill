@@ -21,22 +21,27 @@ Extract, normalize, and track decisions, patterns, and project state in a centra
 
 ## Quick Start
 
-### 1. Install
+### 1. Install (One Command for All Platforms)
 
-Clone or copy this repository to your platform's skill directory:
+Clone repo and run universal installer:
 
 ```bash
-# Claude Code
-mkdir -p ~/.claude/skills/
-cp -r toleria-knowledge-orchestrator-skill ~/.claude/skills/
+git clone https://github.com/DevelopersCoffee/toleria-knowledge-orchestrator-skill.git
+cd toleria-knowledge-orchestrator-skill
+./install.sh
+```
 
-# Gemini CLI
-mkdir -p ~/.gemini/skills/
-cp -r toleria-knowledge-orchestrator-skill ~/.gemini/skills/
+This installs to `~/.agents/skills/toleria` and symlinks from:
+- `~/.claude/skills/toleria` → Claude Code
+- `~/.gemini/skills/toleria` → Gemini CLI
+- `~/.copilot/skills/toleria` → Copilot CLI
+- `~/.codex/skills/toleria` → Codex
 
-# Copilot CLI
-mkdir -p ~/.copilot/skills/
-cp -r toleria-knowledge-orchestrator-skill ~/.copilot/skills/
+**Single source of truth** — Update one location, all platforms see changes.
+
+To uninstall:
+```bash
+./install.sh --uninstall
 ```
 
 ### 2. Initialize Vault
@@ -77,6 +82,51 @@ Vault/
 
 # Check project status
 /toleria query project my-project
+```
+
+## Installation Architecture
+
+### How Symlinks Work
+
+The installer creates a **single installation point** (`~/.agents/skills/toleria`) and **symlinks from each platform**:
+
+```
+~/.agents/skills/toleria/              ← Single source of truth
+├── platform.sh
+├── toleria.sh
+├── bootstrap.sh
+├── validate.sh
+└── ... (all files)
+
+~/.claude/skills/toleria ─────┐
+~/.gemini/skills/toleria ─────┼──→ All point to ~/.agents/skills/toleria
+~/.copilot/skills/toleria ────┤
+~/.codex/skills/toleria ───────┘
+```
+
+**Benefits:**
+- ✅ Update once, all platforms see changes
+- ✅ No duplication across agents
+- ✅ Consistent version across platforms
+- ✅ Easy uninstall (removes symlinks + source)
+
+### Manual Installation (Advanced)
+
+If `install.sh` doesn't work on your system:
+
+```bash
+# 1. Copy to single location
+mkdir -p ~/.agents/skills/
+cp -r toleria-knowledge-orchestrator-skill ~/.agents/skills/toleria
+
+# 2. Create symlinks manually
+ln -s ~/.agents/skills/toleria ~/.claude/skills/toleria
+ln -s ~/.agents/skills/toleria ~/.gemini/skills/toleria
+ln -s ~/.agents/skills/toleria ~/.copilot/skills/toleria
+ln -s ~/.agents/skills/toleria ~/.codex/skills/toleria
+
+# 3. Verify
+ls -la ~/.claude/skills/toleria   # Should show → ~/.agents/skills/toleria
 ```
 
 ## Architecture
