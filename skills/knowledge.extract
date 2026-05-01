@@ -1,0 +1,109 @@
+#!/bin/bash
+
+###############################################################################
+# knowledge.extract skill - Parse text, extract decisions + patterns
+#
+# Input:  text (plain text or diff)
+# Output: JSON array [{type, title, content, tags}]
+#
+# Supported markers (explicit extraction only):
+# - decision: "Decision:" prefix
+# - pattern: "Pattern:" prefix
+# - tech-debt: "Tech debt:" or "TODO:" prefix
+#
+# Exit codes:
+#   0 = success (even if no matches found)
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Validate input
+if [[ $# -eq 0 ]]; then
+  INPUT=$(cat)
+else
+  INPUT="$@"
+fi
+
+# Ensure we have input
+if [[ -z "$INPUT" ]]; then
+  echo '[]'
+  exit 0
+fi
+
+# Extract decisions
+extract_decisions() {
+  local text="$1"
+  local results='['
+  local first=1
+
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^[[:space:]]*(Decision|DECISION):[[:space:]]*(.+) ]]; then
+      title="${line##*:}"  # Everything after the colon
+      title="${title#[[:space:]]}"  # Remove leading whitespace
+
+      if [[ -n "$title" ]]; then
+        if (( first == 0 )); then results+=','; fi
+        first=0
+        results+=$(jq -n --arg type "decision" --arg title "$title" --arg content "$text" '{type: $type, title: $title, content: $content, tags: ["auto:extracted"]}')
+      fi
+    fi
+  done <<< "$text"
+  echo "$results"']'
+}
+
+# Extract patterns
+extract_patterns() {
+  local text="$1"
+  local results='['
+  local first=1
+
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^[[:space:]]*(Pattern|PATTERN):[[:space:]]*(.+) ]]; then
+      title="${line##*:}"
+      title="${title#[[:space:]]}"
+
+      if [[ -n "$title" ]]; then
+        if (( first == 0 )); then results+=','; fi
+        first=0
+        results+=$(jq -n --arg type "pattern" --arg title "$title" --arg content "$text" '{type: $type, title: $title, content: $content, tags: ["auto:extracted"]}')
+      fi
+    fi
+  done <<< "$text"
+  echo "$results"']'
+}
+
+# Extract tech-debt
+extract_tech_debt() {
+  local text="$1"
+  local results='['
+  local first=1
+
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^[[:space:]]*(Tech[[:space:]]debt|TODO|FIXME):[[:space:]]*(.+) ]]; then
+      title="${line##*:}"
+      title="${title#[[:space:]]}"
+
+      if [[ -n "$title" ]]; then
+        if (( first == 0 )); then results+=','; fi
+        first=0
+        results+=$(jq -n --arg type "tech-debt" --arg title "$title" --arg content "$text" '{type: $type, title: $title, content: $content, tags: ["auto:extracted"]}')
+      fi
+    fi
+  done <<< "$text"
+  echo "$results"']'
+}
+
+# Extract each type
+DECISIONS=$(extract_decisions "$INPUT")
+PATTERNS=$(extract_patterns "$INPUT")
+TECH_DEBT=$(extract_tech_debt "$INPUT")
+
+# Merge arrays using jq
+COMBINED=$(jq -s 'add | map(select(.title != null and (.title | length) > 0)) | unique_by(.title)' \
+  <(echo "$DECISIONS") <(echo "$PATTERNS") <(echo "$TECH_DEBT") 2>/dev/null || echo '[]')
+
+echo "$COMBINED"
+exit 0

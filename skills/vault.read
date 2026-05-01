@@ -1,0 +1,79 @@
+#!/bin/bash
+
+###############################################################################
+# vault.read skill - Read note from vault, parse frontmatter + content
+#
+# Input:  file_path (relative to VAULT_ROOT)
+# Output: JSON {frontmatter, content}
+#
+# Exit codes:
+#   0 = success
+#   1 = file not found
+#   2 = invalid YAML
+#   3 = malformed frontmatter
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Source utilities
+source "$REPO_DIR/platform.sh"
+source "$SCRIPT_DIR/utils/yaml.sh"
+
+# Get vault root (allow override via env or default)
+VAULT_ROOT="${VAULT_ROOT:-$(get_home)/Documents/Vault}"
+
+# Validate input
+if [[ $# -eq 0 ]]; then
+  echo '{"error":"missing file_path","code":1}' >&2
+  exit 1
+fi
+
+FILE_PATH="$1"
+
+# Prevent path traversal
+if [[ "$FILE_PATH" == *".."* ]]; then
+  echo '{"error":"invalid path (contains ..)","code":1}' >&2
+  exit 1
+fi
+
+# Resolve full path
+FULL_PATH="$VAULT_ROOT/$FILE_PATH"
+
+# Check file exists
+if [[ ! -f "$FULL_PATH" ]]; then
+  echo '{"error":"file not found","path":"'"$FILE_PATH"'","code":1}' >&2
+  exit 1
+fi
+
+# Check file is readable
+if [[ ! -r "$FULL_PATH" ]]; then
+  echo '{"error":"permission denied","path":"'"$FILE_PATH"'","code":1}' >&2
+  exit 1
+fi
+
+# Parse YAML frontmatter
+YAML_JSON=$(yaml_parse_frontmatter "$FULL_PATH")
+
+# Validate YAML parsed to valid JSON
+if ! echo "$YAML_JSON" | jq . >/dev/null 2>&1; then
+  echo '{"error":"invalid YAML in frontmatter","path":"'"$FILE_PATH"'","code":2}' >&2
+  exit 2
+fi
+
+# Extract content
+CONTENT=$(yaml_extract_content "$FULL_PATH")
+
+# Escape content for JSON
+CONTENT_ESCAPED=$(jq -Rs . <<< "$CONTENT")
+
+# Combine into output
+OUTPUT=$(jq -n \
+  --argjson frontmatter "$YAML_JSON" \
+  --argjson content "$CONTENT_ESCAPED" \
+  '{frontmatter: $frontmatter, content: $content}')
+
+echo "$OUTPUT"
+exit 0

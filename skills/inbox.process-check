@@ -1,0 +1,48 @@
+#!/bin/bash
+
+###############################################################################
+# inbox.process-check - Check if INBOX has new items without processing
+#
+# Input:  none
+# Output: JSON {pending_count, status, items: [...]}
+#
+# Status:
+# - "up_to_date": No items in INBOX
+# - "pending": Items waiting for processing
+#
+# Exit codes:
+#   0 = up to date or has pending
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+source "$REPO_DIR/platform.sh"
+
+VAULT_ROOT="${VAULT_ROOT:-$(get_home)/Documents/Vault}"
+
+# Count pending items
+if [[ ! -d "$VAULT_ROOT/INBOX" ]]; then
+  echo '{"pending_count": 0, "status": "up_to_date", "items": []}'
+  exit 0
+fi
+
+items='[]'
+count=0
+
+while IFS= read -r file; do
+  filename=$(basename "$file")
+  items=$(echo "$items" | jq --arg f "$filename" '. += [$f]')
+  ((count++))
+done < <(find "$VAULT_ROOT/INBOX" -type f -name "*.md" 2>/dev/null)
+
+if (( count == 0 )); then
+  echo '{"pending_count": 0, "status": "up_to_date", "items": []}'
+else
+  jq -n --argjson c "$count" --argjson items "$items" \
+    '{pending_count: $c, status: "pending", items: $items}'
+fi
+
+exit 0

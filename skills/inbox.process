@@ -1,0 +1,191 @@
+#!/bin/bash
+
+###############################################################################
+# inbox.process skill - Process INBOX notes, classify, move, link
+#
+# Input:  [file_path] (if omitted, processes all files in INBOX)
+# Output: JSON {processed: N, moved: [...], errors: [...]}
+#
+# Flow:
+# 1. Find note in INBOX/
+# 2. Read + classify (decision/pattern/tech-debt/other)
+# 3. Validate schema
+# 4. Move to DECISIONS/, PATTERNS/, etc.
+# 5. Create wikilinks
+#
+# Exit codes:
+#   0 = success
+#   1 = processing error
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Source utilities
+source "$REPO_DIR/platform.sh"
+source "$SCRIPT_DIR/utils/yaml.sh"
+source "$SCRIPT_DIR/utils/link.sh"
+
+VAULT_ROOT="${VAULT_ROOT:-$(get_home)/Documents/Vault}"
+
+# Classify note content
+classify_note() {
+  local content="$1"
+  local type="other"
+
+  # Simple classification based on content
+  if [[ "$content" =~ (Decision|decided|chose) ]]; then
+    type="decision"
+  elif [[ "$content" =~ (Pattern|pattern|Use.*for) ]]; then
+    type="pattern"
+  elif [[ "$content" =~ (debt|TODO|FIXME|refactor) ]]; then
+    type="tech-debt"
+  fi
+
+  echo "$type"
+}
+
+# Generate ID based on type and content
+generate_id() {
+  local type="$1"
+  local content="$2"
+
+  # Generate hash from content (first 6 chars of md5)
+  local hash
+  if command -v md5sum &>/dev/null; then
+    hash=$(echo -n "$content" | md5sum | cut -c1-6)
+  elif command -v md5 &>/dev/null; then
+    hash=$(echo -n "$content" | md5 | cut -c1-6)
+  else
+    hash=$(date +%s | tail -c 7)  # Fallback to timestamp
+  fi
+
+  case "$type" in
+    decision) echo "DECISION_$hash" ;;
+    pattern) echo "PATTERN_$hash" ;;
+    tech-debt) echo "DEBT_$hash" ;;
+    *) echo "NOTE_$hash" ;;
+  esac
+}
+
+# Get destination folder for type
+get_destination_folder() {
+  local type="$1"
+
+  case "$type" in
+    decision) echo "DECISIONS" ;;
+    pattern) echo "PATTERNS" ;;
+    tech-debt) echo "EXECUTION" ;;
+    *) echo "NOTES" ;;
+  esac
+}
+
+# Process a single file
+process_file() {
+  local inbox_file="$1"
+  local full_path="$VAULT_ROOT/INBOX/$inbox_file"
+
+  # Check file exists
+  if [[ ! -f "$full_path" ]]; then
+    echo '{"error":"file not found","file":"'"$inbox_file"'"}' >&2
+    return 1
+  fi
+
+  # Read file
+  local content=$(yaml_extract_content "$full_path")
+  if [[ -z "$content" ]]; then
+    echo '{"error":"empty file","file":"'"$inbox_file"'"}' >&2
+    return 1
+  fi
+
+  # Classify
+  local type=$(classify_note "$content")
+  local id=$(generate_id "$type" "$content")
+  local folder=$(get_destination_folder "$type")
+
+  # Create frontmatter if not present
+  local fm_json=$(yaml_parse_frontmatter "$full_path")
+  if [[ "$fm_json" == "{}" ]]; then
+    # Generate new frontmatter
+    fm_json=$(jq -n \
+      --arg id "$id" \
+      --arg type "$type" \
+      --arg created "$(platform_date_iso8601)" \
+      --arg updated "$(platform_date_iso8601)" \
+      '{
+        id: $id,
+        type: $type,
+        project: null,
+        stack: null,
+        tags: ["auto:classified"],
+        links: [],
+        created_at: $created,
+        updated_at: $updated
+      }')
+  else
+    # Update existing frontmatter
+    fm_json=$(echo "$fm_json" | jq \
+      --arg id "$id" \
+      --arg type "$type" \
+      --arg updated "$(platform_date_iso8601)" \
+      '{
+        id: (.id // $id),
+        type: (.type // $type),
+        project: (.project // null),
+        stack: (.stack // null),
+        tags: (.tags // ["auto:classified"]),
+        links: (.links // []),
+        created_at: .created_at,
+        updated_at: $updated
+      }')
+  fi
+
+  # Destination path
+  local dest_file="$folder/${id}.md"
+  local dest_path="$VAULT_ROOT/$dest_file"
+
+  # Write file using vault.write
+  if ! "$SCRIPT_DIR/vault.write" "$dest_file" "$fm_json" "$content" >/dev/null 2>&1; then
+    echo '{"error":"write failed","file":"'"$inbox_file"'","dest":"'"$dest_file"'"}' >&2
+    return 1
+  fi
+
+  # Remove original from INBOX
+  rm -f "$full_path"
+
+  # Return success with destination
+  echo '{"file":"'"$inbox_file"'","moved_to":"'"$dest_file"'","type":"'"$type"'","id":"'"$id"'"}'
+  return 0
+}
+
+# Main processing
+if [[ $# -gt 0 ]]; then
+  # Process specific file(s)
+  for file in "$@"; do
+    process_file "$file"
+  done
+else
+  # Process all files in INBOX
+  if [[ ! -d "$VAULT_ROOT/INBOX" ]]; then
+    echo '[]'
+    exit 0
+  fi
+
+  results='['
+  first=1
+  while IFS= read -r file; do
+    filename=$(basename "$file")
+    if result=$(process_file "$filename" 2>/dev/null); then
+      if (( first == 0 )); then results+=','; fi
+      first=0
+      results+="$result"
+    fi
+  done < <(find "$VAULT_ROOT/INBOX" -type f -name "*.md" 2>/dev/null || true)
+
+  results+=']'
+  echo "$results"
+fi
+
+exit 0

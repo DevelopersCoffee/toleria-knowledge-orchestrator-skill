@@ -1,0 +1,110 @@
+#!/bin/bash
+
+###############################################################################
+# vault.index skill - Generate INDEX files (decisions, patterns, projects)
+#
+# Input:  [vault_path] (default: VAULT_ROOT)
+# Output: JSON {decisions: [...], patterns: [...], projects: [...]}
+#
+# Generates:
+# - decisions.json: all DECISION_* files
+# - patterns.json: all PATTERN_* files
+# - projects.json: all PROJECT_* files
+#
+# Exit codes:
+#   0 = success
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+source "$REPO_DIR/platform.sh"
+source "$SCRIPT_DIR/utils/yaml.sh"
+
+VAULT_ROOT="${VAULT_ROOT:-$(get_home)/Documents/Vault}"
+SCAN_PATH="${1:-$VAULT_ROOT}"
+INDEX_DIR="$VAULT_ROOT/INDEX"
+
+# Ensure INDEX directory exists
+mkdir -p "$INDEX_DIR"
+
+# Build decision index
+build_decisions() {
+  local decisions='[]'
+
+  while IFS= read -r file; do
+    local fm=$(yaml_parse_frontmatter "$file")
+    if echo "$fm" | jq -e '.id | startswith("DECISION_")' >/dev/null 2>&1; then
+      local id=$(echo "$fm" | jq -r '.id')
+      local title=$(basename "$file" .md)
+      local type=$(echo "$fm" | jq -r '.type')
+      local stack=$(echo "$fm" | jq -r '.stack // empty')
+      local project=$(echo "$fm" | jq -r '.project // empty')
+      local created=$(echo "$fm" | jq -r '.created_at')
+
+      decisions=$(echo "$decisions" | jq --arg id "$id" --arg title "$title" --arg type "$type" --arg stack "$stack" --arg project "$project" --arg created "$created" '. += [{id: $id, title: $title, type: $type, stack: $stack, project: $project, created_at: $created}]')
+    fi
+  done < <(find "$SCAN_PATH/DECISIONS" -type f -name "*.md" 2>/dev/null || true)
+
+  echo "$decisions"
+}
+
+# Build pattern index
+build_patterns() {
+  local patterns='[]'
+
+  while IFS= read -r file; do
+    local fm=$(yaml_parse_frontmatter "$file")
+    if echo "$fm" | jq -e '.id | startswith("PATTERN_")' >/dev/null 2>&1; then
+      local id=$(echo "$fm" | jq -r '.id')
+      local title=$(basename "$file" .md)
+      local type=$(echo "$fm" | jq -r '.type')
+      local stack=$(echo "$fm" | jq -r '.stack // empty')
+      local project=$(echo "$fm" | jq -r '.project // empty')
+      local created=$(echo "$fm" | jq -r '.created_at')
+
+      patterns=$(echo "$patterns" | jq --arg id "$id" --arg title "$title" --arg type "$type" --arg stack "$stack" --arg project "$project" --arg created "$created" '. += [{id: $id, title: $title, type: $type, stack: $stack, project: $project, created_at: $created}]')
+    fi
+  done < <(find "$SCAN_PATH/PATTERNS" -type f -name "*.md" 2>/dev/null || true)
+
+  echo "$patterns"
+}
+
+# Build project index
+build_projects() {
+  local projects='[]'
+
+  while IFS= read -r file; do
+    local fm=$(yaml_parse_frontmatter "$file")
+    if echo "$fm" | jq -e '.type == "project"' >/dev/null 2>&1; then
+      local id=$(echo "$fm" | jq -r '.id')
+      local title=$(echo "$fm" | jq -r '.title // empty')
+      local created=$(echo "$fm" | jq -r '.created_at')
+
+      projects=$(echo "$projects" | jq --arg id "$id" --arg title "$title" --arg created "$created" '. += [{id: $id, title: $title, created_at: $created}]')
+    fi
+  done < <(find "$SCAN_PATH/PROJECTS" -type f -name "*.md" 2>/dev/null || true)
+
+  echo "$projects"
+}
+
+# Generate indices
+DECISIONS=$(build_decisions)
+PATTERNS=$(build_patterns)
+PROJECTS=$(build_projects)
+
+# Write to INDEX files
+echo "$DECISIONS" > "$INDEX_DIR/decisions.json"
+echo "$PATTERNS" > "$INDEX_DIR/patterns.json"
+echo "$PROJECTS" > "$INDEX_DIR/projects.json"
+
+# Output combined index
+jq -n \
+  --argjson decisions "$DECISIONS" \
+  --argjson patterns "$PATTERNS" \
+  --argjson projects "$PROJECTS" \
+  '{decisions: $decisions, patterns: $patterns, projects: $projects}'
+
+exit 0

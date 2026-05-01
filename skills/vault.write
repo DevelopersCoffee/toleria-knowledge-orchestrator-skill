@@ -1,0 +1,148 @@
+#!/bin/bash
+
+###############################################################################
+# vault.write skill - Write note atomically with schema validation
+#
+# Input:  file_path, frontmatter (JSON), content (text)
+# Output: JSON {success: bool, path, message}
+#
+# Features:
+# - Atomic write (write to .tmp, rename on success)
+# - Schema validation before write
+# - Timestamps (created_at, updated_at)
+#
+# Exit codes:
+#   0 = success
+#   1 = validation failed
+#   2 = write failed (permission, disk, etc)
+#   3 = atomic rename failed
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Source utilities
+source "$REPO_DIR/platform.sh"
+source "$SCRIPT_DIR/utils/yaml.sh"
+
+# Get vault root
+VAULT_ROOT="${VAULT_ROOT:-$(get_home)/Documents/Vault}"
+
+# Validate input
+if [[ $# -lt 2 ]]; then
+  echo '{"error":"missing arguments","usage":"vault.write <file_path> <frontmatter_json> [content]","code":1}' >&2
+  exit 1
+fi
+
+FILE_PATH="$1"
+FRONTMATTER_JSON="$2"
+CONTENT="${3:-}"
+
+# Prevent path traversal
+if [[ "$FILE_PATH" == *".."* ]]; then
+  echo '{"error":"invalid path (contains ..)","code":1}' >&2
+  exit 1
+fi
+
+# Ensure directory exists
+FULL_PATH="$VAULT_ROOT/$FILE_PATH"
+DIR_PATH="$(dirname "$FULL_PATH")"
+
+if [[ ! -d "$DIR_PATH" ]]; then
+  mkdir -p "$DIR_PATH" || {
+    echo '{"error":"failed to create directory","path":"'"$DIR_PATH"'","code":2}' >&2
+    exit 2
+  }
+fi
+
+# Validate frontmatter is valid JSON
+if ! echo "$FRONTMATTER_JSON" | jq . >/dev/null 2>&1; then
+  echo '{"error":"invalid frontmatter JSON","code":1}' >&2
+  exit 1
+fi
+
+# Schema validation: check required fields
+validate_schema() {
+  local fm="$1"
+  local required_fields=("id" "type" "created_at" "updated_at")
+
+  for field in "${required_fields[@]}"; do
+    if ! echo "$fm" | jq -e ".$field" >/dev/null 2>&1; then
+      echo '{"error":"missing required field","field":"'"$field"'","code":1}' >&2
+      return 1
+    fi
+  done
+  return 0
+}
+
+if ! validate_schema "$FRONTMATTER_JSON"; then
+  exit 1
+fi
+
+# Generate YAML frontmatter block
+generate_file_content() {
+  local fm="$1"
+  local content="$2"
+
+  # Start with --- marker
+  echo "---"
+
+  # Convert JSON back to YAML (simple key-value format)
+  # Quote values only if they contain special characters
+  echo "$fm" | jq -r 'to_entries | .[] |
+    if .value | type == "array" then
+      .key + ": [" + (.value | map(
+        if type == "string" then
+          (if test("^[a-zA-Z0-9_-]+$") then . else "\"" + . + "\"" end)
+        else tostring
+        end
+      ) | join(", ")) + "]"
+    elif .value | type == "object" then
+      .key + ": " + tostring
+    elif .value | type == "string" then
+      if .value | test("^[a-zA-Z0-9_:/T.Z-]+$") then
+        .key + ": " + .value
+      else
+        .key + ": \"" + .value + "\""
+      end
+    elif .value == null then
+      .key + ": null"
+    else
+      .key + ": " + tostring
+    end'
+
+  # End frontmatter
+  echo "---"
+
+  # Content (if provided)
+  if [[ -n "$content" ]]; then
+    echo ""
+    echo "$content"
+  fi
+}
+
+# Generate file content
+FILE_CONTENT=$(generate_file_content "$FRONTMATTER_JSON" "$CONTENT")
+
+# Create temporary file in same directory (for atomic rename)
+TMP_FILE="${FULL_PATH}.tmp.$$"
+
+# Write to temporary file
+if ! echo "$FILE_CONTENT" > "$TMP_FILE" 2>/dev/null; then
+  rm -f "$TMP_FILE" 2>/dev/null || true
+  echo '{"error":"failed to write temporary file","path":"'"$TMP_FILE"'","code":2}' >&2
+  exit 2
+fi
+
+# Atomic rename
+if ! mv "$TMP_FILE" "$FULL_PATH" 2>/dev/null; then
+  rm -f "$TMP_FILE" 2>/dev/null || true
+  echo '{"error":"failed to rename file (atomic write)","path":"'"$FILE_PATH"'","code":3}' >&2
+  exit 3
+fi
+
+# Success
+echo '{"success":true,"path":"'"$FILE_PATH"'","message":"note written successfully"}'
+exit 0

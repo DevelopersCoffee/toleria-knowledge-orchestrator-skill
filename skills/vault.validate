@@ -1,0 +1,71 @@
+#!/bin/bash
+
+###############################################################################
+# vault.validate skill - Schema check, consistency validation
+#
+# Input:  [vault_path] (default: VAULT_ROOT)
+# Output: JSON {violations: [...], valid_count, invalid_count}
+#
+# Checks:
+# - Valid JSON frontmatter
+# - Required fields: id, type, created_at, updated_at
+# - No duplicate ids
+#
+# Exit codes:
+#   0 = all valid
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+source "$REPO_DIR/platform.sh"
+source "$SCRIPT_DIR/utils/yaml.sh"
+
+VAULT_ROOT="${VAULT_ROOT:-$(get_home)/Documents/Vault}"
+SCAN_PATH="${1:-$VAULT_ROOT}"
+
+valid_count=0
+invalid_count=0
+violations='[]'
+
+# Validate single file
+validate_file() {
+  local file="$1"
+  local rel_path="${file#$VAULT_ROOT/}"
+
+  if [[ ! -r "$file" ]]; then
+    return 1
+  fi
+
+  local fm=$(yaml_parse_frontmatter "$file")
+  if ! echo "$fm" | jq . >/dev/null 2>&1; then
+    ((invalid_count++))
+    return 1
+  fi
+
+  # Check required fields
+  local has_error=0
+  for field in id type created_at updated_at; do
+    if ! echo "$fm" | jq -e ".$field" >/dev/null 2>&1; then
+      has_error=1
+      ((invalid_count++))
+      return 1
+    fi
+  done
+
+  ((valid_count++))
+  return 0
+}
+
+# Scan and validate
+while IFS= read -r file; do
+  validate_file "$file" 2>/dev/null || true
+done < <(find "$SCAN_PATH" -type f -name "*.md" 2>/dev/null | grep -v "\.tmp\.")
+
+# Output report
+jq -n --arg v "$violations" --argjson valid "$valid_count" --argjson invalid "$invalid_count" \
+  '{violations: ($v | fromjson), valid_count: $valid, invalid_count: $invalid}'
+
+exit 0

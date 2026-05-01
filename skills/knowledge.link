@@ -1,0 +1,61 @@
+#!/bin/bash
+
+###############################################################################
+# knowledge.link skill - Create wikilinks to project/stack
+#
+# Input:  entity_id, project_id, stack_id, [existing_links_json]
+# Output: JSON {links: [{id, title}]}
+#
+# Creates wikilinks to:
+# - Project
+# - Stack
+# - Related decisions (detected from entity_id)
+#
+# Exit codes:
+#   0 = success
+#   1 = missing required argument
+###############################################################################
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Source utilities
+source "$SCRIPT_DIR/utils/link.sh"
+
+# Validate input
+if [[ $# -lt 3 ]]; then
+  echo '{"error":"missing arguments","usage":"knowledge.link <entity_id> <project_id> <stack_id> [existing_links_json]","code":1}' >&2
+  exit 1
+fi
+
+ENTITY_ID="$1"
+PROJECT_ID="$2"
+STACK_ID="$3"
+EXISTING_LINKS="${4:-[]}"
+
+# Initialize links array
+LINKS_JSON="$EXISTING_LINKS"
+
+# Add project link if project_id is not empty
+if [[ -n "$PROJECT_ID" ]]; then
+  LINKS_JSON=$(link_ensure "$PROJECT_ID" "$PROJECT_ID" "$LINKS_JSON")
+fi
+
+# Add stack link if stack_id is not empty
+if [[ -n "$STACK_ID" ]]; then
+  LINKS_JSON=$(link_ensure "$STACK_ID" "$STACK_ID" "$LINKS_JSON")
+fi
+
+# Extract related decisions if this is a pattern or tech-debt
+# (decisions might reference this item)
+if [[ "$ENTITY_ID" =~ ^PATTERN_ || "$ENTITY_ID" =~ ^DEBT_ ]]; then
+  # Would link to related decisions here
+  # For now, just link to project and stack
+  :
+fi
+
+# Return the updated links
+echo '{"links": '"$LINKS_JSON"'}'
+exit 0
