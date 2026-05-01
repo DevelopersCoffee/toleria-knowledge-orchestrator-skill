@@ -1,0 +1,96 @@
+{
+  "version": "1.0.0",
+  "project_meta": {
+    "type": "object",
+    "required": ["project_id", "repo_path", "vault_path", "stack_id", "status", "created_at", "last_updated"],
+    "properties": {
+      "project_id": { "type": "string", "pattern": "^[a-z0-9._-]+$" },
+      "repo_path": { "type": "string" },
+      "vault_path": { "type": "string" },
+      "stack_id": { "type": "string", "pattern": "^[A-Z_]+$" },
+      "status": { "enum": ["DEV", "PROD", "STALLED", "ARCHIVED"] },
+      "language": { "type": "string" },
+      "framework": { "type": "string" },
+      "database": { "type": "string" },
+      "created_at": { "type": "string", "format": "date" },
+      "last_updated": { "type": "string", "format": "date" },
+      "description": { "type": "string" }
+    }
+  },
+  "stack_meta": {
+    "type": "object",
+    "required": ["stack_id", "language", "projects", "created_at"],
+    "properties": {
+      "stack_id": { "type": "string", "pattern": "^[A-Z_]+$" },
+      "language": { "type": "string" },
+      "frameworks": { "type": "array", "items": { "type": "string" } },
+      "database": { "type": "array", "items": { "type": "string" } },
+      "infra": { "type": "array", "items": { "type": "string" } },
+      "projects": { "type": "array", "items": { "type": "string" } },
+      "created_at": { "type": "string", "format": "date" },
+      "last_updated": { "type": "string", "format": "date" },
+      "decision_count": { "type": "integer", "minimum": 0 },
+      "pattern_count": { "type": "integer", "minimum": 0 }
+    }
+  },
+  "decision": {
+    "type": "object",
+    "required": ["decision_id", "stack_id", "title", "content", "source_projects", "created_at"],
+    "properties": {
+      "decision_id": { "type": "string", "pattern": "^DECISION_[a-f0-9]{32}$" },
+      "stack_id": { "type": "string", "pattern": "^[A-Z_]+$" },
+      "title": { "type": "string", "minLength": 3 },
+      "content": { "type": "string", "minLength": 10 },
+      "source_projects": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+      "tags": { "type": "array", "items": { "type": "string" } },
+      "reversible": { "type": "boolean" },
+      "created_at": { "type": "string", "format": "date-time" },
+      "last_updated": { "type": "string", "format": "date-time" }
+    }
+  },
+  "pattern": {
+    "type": "object",
+    "required": ["pattern_id", "stack_id", "name", "use_case", "implementation", "source_projects"],
+    "properties": {
+      "pattern_id": { "type": "string", "pattern": "^PATTERN_[a-f0-9]{32}$" },
+      "stack_id": { "type": "string", "pattern": "^[A-Z_]+$" },
+      "category": { "enum": ["logging", "error-handling", "api-design", "testing", "config-management", "other"] },
+      "name": { "type": "string", "minLength": 3 },
+      "use_case": { "type": "string", "minLength": 10 },
+      "implementation": { "type": "string", "minLength": 20 },
+      "code_snippet": { "type": "string" },
+      "pros": { "type": "array", "items": { "type": "string" } },
+      "cons": { "type": "array", "items": { "type": "string" } },
+      "source_projects": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+      "reusability": { "enum": ["high", "medium", "low"] },
+      "created_at": { "type": "string", "format": "date-time" }
+    }
+  },
+  "execution_state": {
+    "type": "object",
+    "required": ["project_id", "stage", "last_updated"],
+    "properties": {
+      "project_id": { "type": "string" },
+      "stage": { "enum": ["DEV", "TEST", "PROD", "STALLED"] },
+      "active_module": { "type": "string" },
+      "completion": { "type": "string", "pattern": "^\\d+%$" },
+      "pending_tasks": { "type": "integer", "minimum": 0 },
+      "blockers": { "type": "integer", "minimum": 0 },
+      "last_commit": { "type": "string" },
+      "last_commit_date": { "type": "string", "format": "date-time" },
+      "last_updated": { "type": "string", "format": "date-time" }
+    }
+  },
+  "vault_config": {
+    "type": "object",
+    "required": ["vault_root", "strict_mode", "repo_read_only", "created_at", "version"],
+    "properties": {
+      "vault_root": { "type": "string" },
+      "strict_mode": { "type": "boolean", "const": true },
+      "repo_read_only": { "type": "boolean", "const": true },
+      "deduplication": { "type": "boolean", "const": true },
+      "created_at": { "type": "string", "format": "date-time" },
+      "version": { "type": "string", "const": "1.0.0" }
+    }
+  }
+}

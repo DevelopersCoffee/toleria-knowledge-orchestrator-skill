@@ -1,0 +1,266 @@
+{
+  "id": "toleria-knowledge-orchestrator",
+  "name": "Toleria Knowledge Orchestrator",
+  "version": "1.0.0",
+  "author": {
+    "name": "Uday Chauhan",
+    "email": "chauhan.s.uday26@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/udaychauhan/toleria-knowledge-orchestrator-skill"
+  },
+  "homepage": "https://github.com/udaychauhan/toleria-knowledge-orchestrator-skill",
+  "documentation": "https://github.com/udaychauhan/toleria-knowledge-orchestrator-skill/blob/main/README.md",
+  "category": "engineering-productivity",
+  "subcategories": [
+    "knowledge-management",
+    "documentation",
+    "project-tracking",
+    "architecture",
+    "team-collaboration"
+  ],
+  "platforms": [
+    "claude-code",
+    "gemini-cli",
+    "copilot-cli",
+    "standalone"
+  ],
+  "description": "Standardized knowledge extraction and project tracking system for personal engineering repositories. Extracts decisions, patterns, and architecture. Maintains single vault of reusable knowledge indexed by tech stack. Tracks real-time project state across all active projects. Platform-agnostic, no MCP dependency for core functionality.",
+  "tags": [
+    "knowledge-management",
+    "documentation",
+    "project-tracking",
+    "architecture",
+    "reusability",
+    "decision-tracking",
+    "tech-stack",
+    "best-practices"
+  ],
+  "requirements": {
+    "system": [
+      "git",
+      "bash/zsh",
+      "grep",
+      "find"
+    ],
+    "filesystem": [
+      "read-write to ~/Documents/Vault",
+      "read access to repos"
+    ],
+    "storage": "~100MB for typical 10-20 projects"
+  },
+  "configuration": {
+    "vault_root": {
+      "type": "string",
+      "default": "~/Documents/Vault",
+      "description": "Root directory for all knowledge storage",
+      "required": true
+    },
+    "strict_mode": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enforce schema and abort on violations",
+      "required": false
+    },
+    "repo_read_only": {
+      "type": "boolean",
+      "default": true,
+      "description": "Never write files inside repositories",
+      "required": false
+    },
+    "deduplication": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable automatic deduplication",
+      "required": false
+    }
+  },
+  "functions": {
+    "init-vault": {
+      "description": "Initialize vault directory structure",
+      "params": [],
+      "returns": "vault structure created"
+    },
+    "scan-repo": {
+      "description": "Scan single repository",
+      "params": [
+        {
+          "name": "repo_path",
+          "type": "string",
+          "required": true,
+          "description": "Absolute path to repository"
+        }
+      ],
+      "returns": "project metadata, stack detected, knowledge extracted"
+    },
+    "scan-all-repos": {
+      "description": "Scan all repositories in workspace",
+      "params": [
+        {
+          "name": "workspace_path",
+          "type": "string",
+          "required": true,
+          "description": "Workspace root directory"
+        }
+      ],
+      "returns": "inventory of all projects, stacks, decisions, patterns"
+    },
+    "extract-decisions": {
+      "description": "Extract architectural decisions",
+      "params": [
+        {
+          "name": "repo_path",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": "decisions added to vault"
+    },
+    "extract-patterns": {
+      "description": "Extract reusable code and design patterns",
+      "params": [
+        {
+          "name": "repo_path",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": "patterns added to vault"
+    },
+    "identify-stack": {
+      "description": "Detect tech stack from repository",
+      "params": [
+        {
+          "name": "repo_path",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": "STACK_ID and metadata"
+    },
+    "sync-execution-state": {
+      "description": "Update real-time project state",
+      "params": [
+        {
+          "name": "repo_path",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": "execution state synchronized"
+    },
+    "deduplicate-knowledge": {
+      "description": "Merge duplicate decisions and patterns",
+      "params": [],
+      "returns": "duplicates merged"
+    },
+    "build-index": {
+      "description": "Rebuild all lookup indexes",
+      "params": [],
+      "returns": "indexes built"
+    },
+    "query-knowledge": {
+      "description": "Search knowledge base",
+      "params": [
+        {
+          "name": "query_type",
+          "type": "string",
+          "enum": ["stack", "decision", "pattern", "project"],
+          "required": true
+        },
+        {
+          "name": "query_string",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": "search results"
+    },
+    "publish-stack": {
+      "description": "Export stack and linked knowledge",
+      "params": [
+        {
+          "name": "stack_id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": "bundle file"
+    },
+    "health-check": {
+      "description": "Verify vault integrity",
+      "params": [],
+      "returns": "violations report"
+    }
+  },
+  "quickstart": {
+    "install": "Copy skill to ~/.claude/skills/ or ~/gemini/skills/",
+    "init": "/toleria init-vault",
+    "first-scan": "/toleria scan-repo /path/to/repo",
+    "full-scan": "/toleria scan-all-repos ~/workspace",
+    "query": "/toleria query stack JAVA_SPRING"
+  },
+  "examples": [
+    {
+      "title": "Initialize vault",
+      "command": "/toleria init-vault"
+    },
+    {
+      "title": "Scan a project",
+      "command": "/toleria scan-repo ~/workspace/my-project"
+    },
+    {
+      "title": "Scan all projects",
+      "command": "/toleria scan-all-repos ~/workspace"
+    },
+    {
+      "title": "Find patterns for Java Spring",
+      "command": "/toleria query stack JAVA_SPRING"
+    },
+    {
+      "title": "Find auth decisions",
+      "command": "/toleria query decision auth"
+    },
+    {
+      "title": "Check vault health",
+      "command": "/toleria health-check"
+    }
+  ],
+  "changelog": {
+    "1.0.0": {
+      "date": "2026-05-01",
+      "changes": [
+        "Initial release",
+        "Support for 12 core functions",
+        "Multi-platform support (Claude Code, Gemini CLI, Copilot CLI)",
+        "Vault-based storage",
+        "Tech stack indexing",
+        "Decision and pattern extraction",
+        "Real-time project state tracking"
+      ]
+    }
+  },
+  "roadmap": [
+    "Web UI for vault browsing",
+    "VS Code extension",
+    "JetBrains IDE integration",
+    "Automated pattern detection",
+    "Knowledge graph visualization",
+    "Team vault with encrypted sharing"
+  ],
+  "rating": {
+    "stars": 0,
+    "reviews": 0,
+    "downloads": 0
+  },
+  "status": "production",
+  "verified": false,
+  "maintainers": [
+    {
+      "name": "Uday Chauhan",
+      "email": "chauhan.s.uday26@gmail.com"
+    }
+  ]
+}
